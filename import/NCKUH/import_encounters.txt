@@ -1,0 +1,30 @@
+#!/usr/bin/python
+
+import sys
+import urllib2
+from BeautifulSoup import BeautifulSoup
+
+if len(sys.argv) < 2:
+        print ("USAGE: import_encounters 00000000")
+        sys.exit(1)
+
+url_a='http://hisweb.hosp.ncku/Emrquery/tree/list.aspx?chartno='
+url_z='&start=2000/1/1&stop=2014-05-13&query=0'
+
+url=url_a + sys.argv[1] + url_z
+
+page=urllib2.urlopen(url)
+soup=BeautifulSoup(page.read())
+events=soup.find('li',{'id':'emr'}).ul
+
+encounter=events.findChildren('li', recursive=False)
+for enc in encounter:
+        enctext=enc.a.text
+        enclink=enc.a.get('href')
+
+        print enctext # for debug
+        print enclink
+
+        # Parse enctext according to OPD, admission, and ER
+
+# Generate standardized EMR

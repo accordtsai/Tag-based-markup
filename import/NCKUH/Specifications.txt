@@ -1,0 +1,24 @@
+Specifications and hints to implementing the import filter system
+
+Institution: NCKUH
+Last modified: 2014/5/13
+
+We will import data from 3 different sources: 
+EMR: Physician-written notes and orders
+HIS: Lab values and report system
+PACS: DICOM-based images
+
+The images of the PACS system will often have an accompanying entry in the HIS system. Duplication is not necessary, and we will ignore the PACS entry unless there is no corresponding HIS entry (i.e. image-only and no report).
+
+== EMR ==
+
+URL: http://hisweb.hosp.ncku/Emrquery/tree/list.aspx?chartno=00000000&start=2000/1/1&stop=2014-05-13&query=0
+¡÷ Returns tree with listing of inpatient & outpatient visits
+¡÷ <li id='emr'>
+¡÷ Extract all top-level OPD and admission records, and corresponding links for EMR viewing
+¡÷ Populate database
+
+== HIS ==
+
+== PACS ==
+Proprietary PACS client ... orz

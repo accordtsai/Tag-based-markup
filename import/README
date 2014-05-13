@@ -1,0 +1,3 @@
+This directory hostes the tools required for automatic import of existing EMR data into the database.
+
+Specific tools (filters) must be written for each institution, which extracts data from the specific IT infrastructure and converts it into the standardized form. 
