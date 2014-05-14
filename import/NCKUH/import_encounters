@@ -1,0 +1,86 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import sys
+import urllib2
+import re
+from BeautifulSoup import BeautifulSoup
+
+if len(sys.argv) < 2:
+	print ("USAGE: import_encounters 00000000")
+	sys.exit(1)
+
+def parse_title(title):
+	### Returns type, date, VS, Clinic_no parsed from title
+#	pattern = re.compile("^\((.*)\)(20[0-9\/]*)&nbsp;(.*)&nbsp;(.*)$")
+	pattern_type = re.compile("^\((.*)\)")
+	pattern_opd = re.compile("(20[0-9\/]*)&nbsp;(.*)&nbsp;(.*)$")
+	pattern_ipd = re.compile("(20[0-9\/]*)[\s-]+(20[0-9\/]*)&nbsp;(.*)&nbsp;(.*)$")
+	
+	type_c = pattern_type.match(title).group(1)
+
+	print "Type_c:", type_c
+
+	if (type_c == u"門診"):
+		# OPD record parsing
+		type="OPD"
+		result = pattern_opd.search(title)
+
+		if result:
+		        print result.group(1)
+		        print result.group(2)
+		        print result.group(3)
+		else:
+			# Cannot parse!
+		        print 'No match'
+
+	elif (type_c == u"住院" or type_c == u"急診"):
+		# IPD record parsing
+		if type_c == u"住院":
+			type="IPD"
+		else:
+			type="ER"
+
+                result = pattern_ipd.search(title)
+
+                if result:
+                        print result.group(1)
+                        print result.group(2)
+                        print result.group(3)
+			print result.group(4)
+                else:
+                        # Cannot parse!
+                        print 'No match'
+
+	elif (type_c == u"住院中"):
+		# Currently under admission; ignore
+		# Ignore
+		type='Adm'
+	else:
+		print "Unable to parse title type!"
+		type="Undefined"
+	return type
+
+url_a='http://hisweb.hosp.ncku/Emrquery/tree/list.aspx?chartno='
+url_z='&start=2013/10/1&stop=2014-05-13&query=0'
+
+url=url_a + sys.argv[1] + url_z
+
+page=urllib2.urlopen(url)
+soup=BeautifulSoup(page.read())
+events=soup.find('li',{'id':'emr'}).ul
+
+encounter=events.findChildren('li', recursive=False)
+for enc in encounter:
+	enctext=enc.a.text
+	enclink=enc.a.get('href')
+
+#	print enctext # for debug
+#	print enclink
+
+	type = parse_title(enctext)
+	print type
+	print enclink
+	# Parse enctext according to OPD, admission, and ER
+
+# Generate standardized EMR

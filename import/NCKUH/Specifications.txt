@@ -1,7 +1,7 @@
 Specifications and hints to implementing the import filter system
 
 Institution: NCKUH
-Last modified: 2014/5/13
+Last modified: 2014/5/14
 
 We will import data from 3 different sources: 
 EMR: Physician-written notes and orders
@@ -12,11 +12,20 @@ The images of the PACS system will often have an accompanying entry in the HIS s
 
 == EMR ==
 
-URL: http://hisweb.hosp.ncku/Emrquery/tree/list.aspx?chartno=00000000&start=2000/1/1&stop=2014-05-13&query=0
+High-level explanation of what we do:
+
+import_encounters:
+
+Using URL: http://hisweb.hosp.ncku/Emrquery/tree/list.aspx?chartno=00000000&start=2000/1/1&stop=2014-05-13&query=0
 ¡÷ Returns tree with listing of inpatient & outpatient visits
 ¡÷ <li id='emr'>
 ¡÷ Extract all top-level OPD and admission records, and corresponding links for EMR viewing
-¡÷ Populate database
+
+import_soap:
+
+Link to individual encounters
+¡÷ Download individual encounter data
+¡÷ Parse into SOAP (subjective, objective, assessment, plan)
 
 == HIS ==
 

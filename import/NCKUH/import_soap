@@ -1,0 +1,48 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+### Imports SOAP text content, taking the url as an argument
+### USAGE: import_soap url
+
+import sys
+import urllib2
+import re
+from BeautifulSoup import BeautifulSoup
+
+if len(sys.argv) < 2:
+	print ("USAGE: import_soap url")
+	sys.exit(1)
+
+
+page=urllib2.urlopen(sys.argv[1])
+soup=BeautifulSoup(page.read())
+
+soap_content=soup.find('div',{'class':'portlet-content'})
+others=soup.findAll('div', {'class':'iportlet-content'})
+
+# Remove all <br /> tags
+for linebreak in soup.findAll('br'):
+	linebreak.extract()
+
+SOAP=soup.findAll('div',{'class':'small'})
+# S = SOAP[1], O=SOAP[2], A=SOAP[3], P=SOAP[4]
+
+
+print "Subjective:"
+for line in SOAP[1].contents:
+	print line
+
+print "Objective:"
+for line in SOAP[2].contents:
+	print line
+
+print "Assessment:"
+for line in SOAP[3].contents:
+	print line
+
+print "Plan:"
+for line in SOAP[4].contents:
+	print line
+
+# Generate standardized EMR
+# Further processing of other information (medication, labs) in $others
