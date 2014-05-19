@@ -13,36 +13,52 @@ if len(sys.argv) < 2:
 	print ("USAGE: import_soap url")
 	sys.exit(1)
 
+def parse_soap(url):
+        page=urllib2.urlopen(url)
+        soup=BeautifulSoup(page.read())
 
-page=urllib2.urlopen(sys.argv[1])
-soup=BeautifulSoup(page.read())
+        soap_content=soup.find('div',{'class':'portlet-content'})
+        others=soup.findAll('div', {'class':'iportlet-content'})
 
-soap_content=soup.find('div',{'class':'portlet-content'})
-others=soup.findAll('div', {'class':'iportlet-content'})
+        # Remove all <br /> tags
+        for linebreak in soup.findAll('br'):
+                linebreak.extract()
 
-# Remove all <br /> tags
-for linebreak in soup.findAll('br'):
-	linebreak.extract()
+        headers=soup.findAll('p')
 
-SOAP=soup.findAll('div',{'class':'small'})
-# S = SOAP[1], O=SOAP[2], A=SOAP[3], P=SOAP[4]
+	(S,O,A,P) = (None,None,None,None)
 
+        for h in headers:
+                if (re.match(u'\[Subjective\]', h.text)):
+                        S = h.findNext('div')
+                if (re.match(u'\[Objective\]', h.text)):
+                        O = h.findNext('div')
+                if (re.match(u'\[Assessment\]', h.text)):
+                        A = h.findNext('div')
+                if (re.match(u'\[Assessment & Plan\]', h.text)):
+                        P = h.findNext('div')
+
+	return (S,O,A,P)
+
+
+(S,O,A,P) = parse_soap(sys.argv[1])
 
 print "Subjective:"
-for line in SOAP[1].contents:
-	print line
+if S:
+	for line in S.contents:
+		print line
 
 print "Objective:"
-for line in SOAP[2].contents:
-	print line
+if O:
+	for line in O.contents:
+		print line
 
 print "Assessment:"
-for line in SOAP[3].contents:
-	print line
+if A:
+	for line in A.contents:
+		print line
 
 print "Plan:"
-for line in SOAP[4].contents:
-	print line
-
-# Generate standardized EMR
-# Further processing of other information (medication, labs) in $others
+if P:
+	for line in P.contents:
+		print line

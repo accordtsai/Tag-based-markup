@@ -1,7 +1,7 @@
 Specifications and hints to implementing the import filter system
 
 Institution: NCKUH
-Last modified: 2014/5/14
+Last modified: 2014/5/19
 
 We will import data from 3 different sources: 
 EMR: Physician-written notes and orders
