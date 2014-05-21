@@ -1,0 +1,50 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+### Imports admission record, taking the url as an argument
+### USAGE: import_ipd url
+
+import sys
+import urllib2
+import re
+from BeautifulSoup import BeautifulSoup
+
+if len(sys.argv) < 2:
+	print ("USAGE: import_ipd url")
+	sys.exit(1)
+
+def parse_ipd(url):
+        page=urllib2.urlopen(url)
+        soup=BeautifulSoup(page.read())
+
+        headers=soup.findAll('div', {'class':'iportlet-header'})
+
+        # Remove all <br /> tags
+#        for linebreak in soup.findAll('br'):
+#                linebreak.extract()
+
+	finaltext=''
+
+        for h in headers:
+		category = h.text
+		# Note: 
+		# if medicine then <div class='medicine'>
+		# if orders then <div class='plan'>
+
+		if (category == u'[住院會診]'):
+			content = h.findNext('div',{'class':'small'})
+			final += parse_consult(content)
+		if (category == u'[New Discharge Note]'):
+			content = h.findNext('div',{'class':'small'})
+			final += parse_discharge(content)
+		if (category == u'[醫囑清單 : 依日期]'):
+			content = h.findNext('div',{'class':'plan'})
+			final += parse_orders(content)
+	
+
+	return final
+
+# TODO
+def parse_consult(content):
+def parse_discharge(content):
+def parse_orders(content):
