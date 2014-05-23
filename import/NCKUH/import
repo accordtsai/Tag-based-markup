@@ -1,0 +1,189 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import sys
+import urllib2
+import re
+from BeautifulSoup import BeautifulSoup, BeautifulStoneSoup
+
+if len(sys.argv) < 2:
+	print ("USAGE: import_encounters 00000000")
+	sys.exit(1)
+
+baseurl='http://hisweb.hosp.ncku/Emrquery/tree/'
+emrservice='http://hisweb.hosp.ncku/HISService/OPD/nckuHisWeb/EmrService.svc'
+header_data = {'Content-Type': 'application/soap+xml; charset=utf-8','User-Agent':''}
+
+### EMR(SOAP) portion ###
+
+def parse_title(title):
+	### Returns type, date, VS, Clinic_no parsed from title
+#	pattern = re.compile("^\((.*)\)(20[0-9\/]*)&nbsp;(.*)&nbsp;(.*)$")
+	pattern_type = re.compile("^\((.*)\)")
+	pattern_opd = re.compile("(20[0-9\/]*)&nbsp;(.*)&nbsp;(.*)$")
+	pattern_ipd = re.compile("(20[0-9\/]*)[\s-]+(20[0-9\/]*)&nbsp;(.*)&nbsp;(.*)$")
+	
+	type_c = pattern_type.match(title).group(1)
+
+	if (type_c == u"門診"):
+		# OPD record parsing
+		type="OPD"
+		result = pattern_opd.search(title)
+
+		if result:
+				time = result.group(1)
+#				print result.group(1) # date
+#				print result.group(2) # VS
+#				print result.group(3) # Dept
+		else:
+			# Cannot parse!
+		        print 'RE for OPD title record parsing failed'
+
+	elif (type_c == u"住院" or type_c == u"急診"):
+		# IPD record parsing
+		if type_c == u"住院":
+			type="IPD"
+		else:
+			type="ER"
+
+                result = pattern_ipd.search(title)
+
+                if result:
+			time = result.group(1)
+#                        print result.group(1) # Admission date
+#                        print result.group(2) # Discharge date
+#                        print result.group(3) # VS
+#			print result.group(4) # Dept
+                else:
+                        # Cannot parse!
+                        print 'RE for IPD/ER title record parsing failed'
+
+	elif (type_c == u"住院中"):
+		# Currently under admission; ignore
+		# Ignore
+		type='Adm'
+	else:
+		print "Unable to parse title type!"
+		type="Undefined"
+	return (time,type)
+
+
+def parse_soap(url):
+	url = baseurl + url
+        page=urllib2.urlopen(url)
+        soup=BeautifulSoup(page.read())
+
+        soap_content=soup.find('div',{'class':'portlet-content'})
+        others=soup.findAll('div', {'class':'iportlet-content'})
+
+        # Remove all <br /> tags
+        for linebreak in soup.findAll('br'):
+                linebreak.extract()
+
+        headers=soup.findAll('p')
+
+	res={}
+
+        for h in headers:
+                if (re.match(u'\[Subjective\]', h.text)):
+                        res['S'] = h.findNext('div')
+                if (re.match(u'\[Objective\]', h.text)):
+                        res['O'] = h.findNext('div')
+                if (re.match(u'\[Assessment\]', h.text)):
+                        res['A'] = h.findNext('div')
+                if (re.match(u'\[Assessment & Plan\]', h.text)):
+                        res['P'] = h.findNext('div')
+
+	return res
+
+def get_EMR(mrd, start='2014/1/10', end='2014/5/21'):
+	url_a='http://hisweb.hosp.ncku/Emrquery/tree/list.aspx?chartno='+mrd
+	url_b='&start='+start+'&stop='+end+'&query=0'
+
+	url=url_a + url_b
+
+	page=urllib2.urlopen(url)
+	soup=BeautifulSoup(page.read())
+	events=soup.find('li',{'id':'emr'}).ul
+
+	res={}
+	encounter=events.findChildren('li', recursive=False)
+	for enc in encounter:
+		enctext=enc.a.text
+		enclink=enc.a.get('href')
+
+		(time,type) = parse_title(enctext)
+
+		if (type=='OPD'):
+			res[time] = parse_soap(enclink)
+		# Other types (ipd, ER) to be parsed
+	return res
+
+
+### HIS(labs) portion ###
+
+def get_labs(mrd, start='2014/1/10', end='2014/5/21'):
+	soap_env = build_soap_menu(mrd, start, end)
+
+	url = urllib2.Request(emrservice, soap_env, header_data)
+	response = urllib2.urlopen(url)
+
+	soup = BeautifulStoneSoup(response.read())
+
+	reports_all = soup.findAll('retexaminerecord')
+#	print "Total", len(reports_all), "report entries found. Going through each one..."
+
+	results = {}
+
+	for i in range(len(reports_all)):
+		if (reports_all[i].status.text != u'\u78ba\u8a8d\u5831\u544a'): # Unconfirmed report
+#			print "Skipping", i ,"due to unconfirmed report"
+			continue
+
+		(time, text) = get_item(mrd, reports_all[i].requset_no.text)
+#		print '=========='+ time +'=========='
+#		print text
+		results[time]=text
+
+	return results
+
+def build_soap_menu(mrd, start, end):
+	s_head='<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://www.w3.org/2005/08/addressing"><s:Header><a:Action s:mustUnderstand="1">http://tempuri.org/IEmrService/EMRQueryReportRecord</a:Action><a:MessageID>urn:uuid:713986fa-2887-494b-a008-6d696ad019d1</a:MessageID><a:ReplyTo><a:Address>http://www.w3.org/2005/08/addressing/anonymous</a:Address></a:ReplyTo><a:To s:mustUnderstand="1">http://hisweb.hosp.ncku/HISService/OPD/nckuHisWeb/EmrService.svc</a:To></s:Header><s:Body><EMRQueryReportRecord xmlns="http://tempuri.org/"><ChartNO><xs:schema id="NewDataSet" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata"><xs:element name="NewDataSet" msdata:IsDataSet="true" msdata:UseCurrentLocale="true"><xs:complexType><xs:choice minOccurs="0" maxOccurs="unbounded"><xs:element name="Table1"><xs:complexType><xs:sequence><xs:element name="source" type="xs:string" minOccurs="0"/><xs:element name="source1" type="xs:string" minOccurs="0"/><xs:element name="source2" type="xs:string" minOccurs="0"/><xs:element name="source3" type="xs:string" minOccurs="0"/><xs:element name="Chart_No" type="xs:string" minOccurs="0"/><xs:element name="dept_Code" type="xs:string" minOccurs="0"/><xs:element name="start_time" type="xs:string" minOccurs="0"/><xs:element name="end_time" type="xs:string" minOccurs="0"/><xs:element name="Doctor_Code" type="xs:string" minOccurs="0"/><xs:element name="specimen_Id" type="xs:string" minOccurs="0"/><xs:element name="Body_Site_Code" type="xs:string" minOccurs="0"/><xs:element name="request_no" type="xs:string" minOccurs="0"/><xs:element name="report_class" type="xs:string" minOccurs="0"/></xs:sequence></xs:complexType></xs:element><xs:element name="EMR_Query_Log"><xs:complexType><xs:sequence><xs:element name="Query_Time" type="xs:string"/><xs:element name="Employee_Code" type="xs:string" minOccurs="0"/><xs:element name="Employee_Name" type="xs:string" minOccurs="0"/><xs:element name="Query_Item_Id" type="xs:string" minOccurs="0"/><xs:element name="Login_System_Id" type="xs:string" minOccurs="0"/><xs:element name="Query_Content" type="xs:string" minOccurs="0"/><xs:element name="Action_Type" type="xs:string" minOccurs="0"/><xs:element name="Output_Count" type="xs:string" minOccurs="0"/><xs:element name="Output_Device" type="xs:string" minOccurs="0"/></xs:sequence></xs:complexType></xs:element></xs:choice></xs:complexType><xs:unique name="Constraint1" msdata:PrimaryKey="true"><xs:selector xpath=".//EMR_Query_Log"/><xs:field xpath="Query_Time"/></xs:unique></xs:element></xs:schema><diffgr:diffgram xmlns:diffgr="urn:schemas-microsoft-com:xml-diffgram-v1" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata"><NewDataSet xmlns=""><Table1 diffgr:id="Table11" msdata:rowOrder="0" diffgr:hasChanges="inserted"><source/><Chart_No>'
+	s_body=mrd + '</Chart_No><dept_Code>0000</dept_Code><start_time>' + start + '</start_time><end_time>' + end
+	s_end='</end_time><Doctor_Code/><specimen_Id/><Body_Site_Code/><report_class/></Table1></NewDataSet></diffgr:diffgram></ChartNO></EMRQueryReportRecord></s:Body></s:Envelope>'
+	return s_head + s_body + s_end
+
+def build_soap_item(mrd, serialno):
+	# Note: Still trigger the logging event. Cannot get a correct response without it.
+	s_part1='<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://www.w3.org/2005/08/addressing"><s:Header><a:Action s:mustUnderstand="1">http://tempuri.org/IEmrService/EMRGetExamineReport</a:Action><a:MessageID>urn:uuid:1c90d277-c568-4e8a-a265-4d4556038660</a:MessageID><a:ReplyTo><a:Address>http://www.w3.org/2005/08/addressing/anonymous</a:Address></a:ReplyTo><a:To s:mustUnderstand="1">http://hisweb.hosp.ncku/HISService/OPD/nckuHisWeb/EmrService.svc</a:To></s:Header><s:Body><EMRGetExamineReport xmlns="http://tempuri.org/"><requestNo xmlns:b="http://schemas.microsoft.com/2003/10/Serialization/Arrays" xmlns:i="http://www.w3.org/2001/XMLSchema-instance"><b:string>'
+	s_part2 = serialno + '</b:string></requestNo><Chart_No>' + mrd
+	s_part3='</Chart_No><ds><xs:schema id="NewDataSet" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata"><xs:element name="NewDataSet" msdata:IsDataSet="true" msdata:UseCurrentLocale="true"><xs:complexType><xs:choice minOccurs="0" maxOccurs="unbounded"><xs:element name="EMR_Query_Log"><xs:complexType><xs:sequence><xs:element name="Query_Time" type="xs:string"/><xs:element name="Employee_Code" type="xs:string" minOccurs="0"/><xs:element name="Employee_Name" type="xs:string" minOccurs="0"/><xs:element name="Query_Item_Id" type="xs:string" minOccurs="0"/><xs:element name="Login_System_Id" type="xs:string" minOccurs="0"/><xs:element name="Query_Content" type="xs:string" minOccurs="0"/><xs:element name="Action_Type" type="xs:string" minOccurs="0"/><xs:element name="Output_Count" type="xs:string" minOccurs="0"/><xs:element name="Output_Device" type="xs:string" minOccurs="0"/></xs:sequence></xs:complexType></xs:element></xs:choice></xs:complexType><xs:unique name="Constraint1" msdata:PrimaryKey="true"><xs:selector xpath=".//EMR_Query_Log"/><xs:field xpath="Query_Time"/></xs:unique></xs:element></xs:schema><diffgr:diffgram xmlns:diffgr="urn:schemas-microsoft-com:xml-diffgram-v1" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata"><NewDataSet xmlns=""><EMR_Query_Log diffgr:id="EMR_Query_Log1" msdata:rowOrder="0" diffgr:hasChanges="inserted"><Query_Time></Query_Time><Employee_Code></Employee_Code><Employee_Name></Employee_Name><Query_Item_Id></Query_Item_Id><Login_System_Id>EMR</Login_System_Id><Query_Content></Query_Content><Action_Type></Action_Type><Output_Count></Output_Count><Output_Device></Output_Device></EMR_Query_Log></NewDataSet></diffgr:diffgram></ds></EMRGetExamineReport></s:Body></s:Envelope>'
+	return s_part1 + s_part2 + s_part3
+
+def get_item(mrd, serialno):
+	soap_env = build_soap_item(mrd, serialno)
+	url = urllib2.Request(emrservice, soap_env, header_data)
+	response = urllib2.urlopen(url)
+
+	# Throws an UnicodeEncodeError because some genius used <選> as a tag, we will replace it with <gibberish>
+	response_utf8 = response.read().decode('utf-8').replace(u'\u9078', 'gibberish')
+	soup = BeautifulStoneSoup(response_utf8)
+
+	report_attrs = soup.find('retexaminerecord') # All reports under request_no
+	report_text = soup.find('retstatereportlist') # Will return results for text report
+
+	if (report_text): 
+		return report_attrs.execute_time.text, {report_attrs.report_name.text : report_text.report_text.text}
+	else: # No report_text, probably numerical
+		results = {}
+		report_num = soup.findAll('retnumreportlis')
+		for i in range(len(report_num)):
+			results[report_num[i].test_name.text] = report_num[i].test_value.text
+		return report_attrs.execute_time.text, results
+
+
+res_emr = get_EMR(sys.argv[1])
+res_labs = get_labs(sys.argv[1])
+
+print "EMR: ",res_emr.keys()
+print "Labs: ", res_labs.keys()
