@@ -26,11 +26,13 @@ def get_labs(mrd, start='2013/1/10', end='2014/5/21'):
 
 	reports_all = soup.findAll('retexaminerecord')
 	for reportitem in reports_all:
-		print reportitem.report_time.text
-		print reportitem.test_name.text
-		print reportitem.status.text
-		print reportitem.medical_sn.text
-		print reportitem.requset_no.text  # Typo in the original code!
+		print '=========='+ reportitem.report_time.text + reportitem.test_name.text +'=========='
+#		print reportitem.status.text
+#		print reportitem.medical_sn.text
+#		print reportitem.requset_no.text  # Typo in the original code!
+		(time, text) = get_item(mrd, reportitem.requset_no.text)
+		print "Real time:"+time # real time
+		print text
 
 def build_soap_menu(mrd, start, end):
 	s_head='<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://www.w3.org/2005/08/addressing"><s:Header><a:Action s:mustUnderstand="1">http://tempuri.org/IEmrService/EMRQueryReportText</a:Action><a:MessageID>urn:uuid:aa32ab8b-8be8-4189-aef4-b8c468c27b17</a:MessageID><a:ReplyTo><a:Address>http://www.w3.org/2005/08/addressing/anonymous</a:Address></a:ReplyTo><a:To s:mustUnderstand="1">http://hisweb.hosp.ncku/HISService/OPD/nckuHisWeb/EmrService.svc</a:To></s:Header><s:Body><EMRQueryReportText xmlns="http://tempuri.org/"><dataset><xs:schema id="NewDataSet" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata"><xs:element name="NewDataSet" msdata:IsDataSet="true" msdata:UseCurrentLocale="true"><xs:complexType><xs:choice minOccurs="0" maxOccurs="unbounded"><xs:element name="Table1"><xs:complexType><xs:sequence><xs:element name="source" type="xs:string" minOccurs="0"/><xs:element name="source1" type="xs:string" minOccurs="0"/><xs:element name="source2" type="xs:string" minOccurs="0"/><xs:element name="source3" type="xs:string" minOccurs="0"/><xs:element name="Chart_No" type="xs:string" minOccurs="0"/><xs:element name="dept_Code" type="xs:string" minOccurs="0"/><xs:element name="start_time" type="xs:string" minOccurs="0"/><xs:element name="end_time" type="xs:string" minOccurs="0"/><xs:element name="Doctor_Code" type="xs:string" minOccurs="0"/><xs:element name="specimen_Id" type="xs:string" minOccurs="0"/><xs:element name="Body_Site_Code" type="xs:string" minOccurs="0"/><xs:element name="request_no" type="xs:string" minOccurs="0"/><xs:element name="report_class" type="xs:string" minOccurs="0"/></xs:sequence></xs:complexType></xs:element><xs:element name="EMR_Query_Log"><xs:complexType><xs:sequence><xs:element name="Query_Time" type="xs:string"/><xs:element name="Employee_Code" type="xs:string" minOccurs="0"/><xs:element name="Employee_Name" type="xs:string" minOccurs="0"/><xs:element name="Query_Item_Id" type="xs:string" minOccurs="0"/><xs:element name="Login_System_Id" type="xs:string" minOccurs="0"/><xs:element name="Query_Content" type="xs:string" minOccurs="0"/><xs:element name="Action_Type" type="xs:string" minOccurs="0"/><xs:element name="Output_Count" type="xs:string" minOccurs="0"/><xs:element name="Output_Device" type="xs:string" minOccurs="0"/></xs:sequence></xs:complexType></xs:element></xs:choice></xs:complexType><xs:unique name="Constraint1" msdata:PrimaryKey="true"><xs:selector xpath=".//EMR_Query_Log"/><xs:field xpath="Query_Time"/></xs:unique></xs:element></xs:schema><diffgr:diffgram xmlns:diffgr="urn:schemas-microsoft-com:xml-diffgram-v1" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata"><NewDataSet xmlns=""><Table1 diffgr:id="Table11" msdata:rowOrder="0" diffgr:hasChanges="inserted"><source/><Chart_No>'
@@ -57,8 +59,4 @@ def get_item(mrd, serialno):
 	report_data = soup.find('retstatereportlist')
 	return report_attrs.execute_time.text, report_data.report_text.text
 
-#get_labs(sys.argv[1])
-(time, text) = get_item('12020577','913014P07485')
-print time
-print 
-print text
+get_labs(sys.argv[1])

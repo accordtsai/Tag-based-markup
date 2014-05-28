@@ -1,7 +1,7 @@
 Specifications and hints to implementing the import filter system
 
 Institution: NCKUH
-Last modified: 2014/5/19
+Last modified: 2014/5/22
 
 We will import data from 3 different sources: 
 EMR: Physician-written notes and orders
@@ -17,17 +17,187 @@ High-level explanation of what we do:
 import_encounters:
 
 Using URL: http://hisweb.hosp.ncku/Emrquery/tree/list.aspx?chartno=00000000&start=2000/1/1&stop=2014-05-13&query=0
-�� Returns tree with listing of inpatient & outpatient visits
-�� <li id='emr'>
-�� Extract all top-level OPD and admission records, and corresponding links for EMR viewing
+¡÷ Returns tree with listing of inpatient & outpatient visits
+¡÷ <li id='emr'>
+¡÷ Extract all top-level OPD and admission records, and corresponding links for EMR viewing
 
 import_soap:
 
 Link to individual encounters
-�� Download individual encounter data
-�� Parse into SOAP (subjective, objective, assessment, plan)
+¡÷ Download individual encounter data
+¡÷ Parse into SOAP (subjective, objective, assessment, plan)
 
 == HIS ==
 
+There are two types of reports: text and numerical. They are handled by different web services.
+However, the import_labs approach queries all ordered labs (including completed and not completed ones).
+We will query all results, and skip all the unconfirmed lab results.
+
+Example of returned numerical report (from menu):
+// Does not include specimen time, only confirm_time and report_time
+// Does not have request_no either
+
+<retExamineRecord diffgr:id="retExamineRecord4" msdata:rowOrder="3">
+    <choose xml:space="preserve"></choose>
+    <Item_Code>9303FTI</Item_Code>
+    <Report_Time>2014/03/24</Report_Time>
+    <Test_Name1>01Free T4 Index (FTI)(10 )</Test_Name1>
+    <Test_Name>Free T4 Index (FTI)(10 )</Test_Name>
+    <Test_Value>1.93</Test_Value>
+    <Normal_Check>L</Normal_Check>
+    <Ref_High>4</Ref_High>
+    <Ref_Low>2.4</Ref_Low>
+    <Unit>ug/dl</Unit>
+    <Confirm_TIme>2014/03/24</Confirm_TIme>
+    <a1>9999</a1>
+    <Report_Type>1</Report_Type>
+    <Displayno>1</Displayno>
+</retExamineRecord>
+
+Example of returned numerical report (from item):
+(Note multiple test values may be returned on the same result, because they have the same Request_No)
+
+<retExamineRecord diffgr:id="retExamineRecord1" msdata:rowOrder="0">
+    <Chart_No>99999999</Chart_No>
+    <Patient_Name>XXXX</Patient_Name>
+    <Source_Type_Name>門診</Source_Type_Name>
+    <Specimen_Name>血液</Specimen_Name>
+    <Medical_Sn>O20140319999893</Medical_Sn>
+    <Request_No>932014P99821</Request_No>
+    <Source_TYpe_Id>O</Source_TYpe_Id>
+    <Specimen_Id>10</Specimen_Id>
+    <Doctor_Name>蕭振仁</Doctor_Name>
+    <Spec_No>14016654</Spec_No>
+    <Body_Site_Code/>
+    <Body_Site_Small/>
+    <Side_Name/>
+    <Doctor_Code>019580</Doctor_Code>
+    <Dept_Code>33</Dept_Code>
+    <Order_Time>03 19 2014 1:37PM</Order_Time>
+    <Effect_Date>2014-03-19</Effect_Date>
+    <Order_Status>F</Order_Status>
+    <Dept_Name>耳鼻喉科</Dept_Name>
+    <Order_Plan_No>2</Order_Plan_No>
+    <Execute_Time>2014/03/19 17:21:36</Execute_Time>
+    <Report_Type>1</Report_Type>
+    <Report_Kind>RI</Report_Kind>
+    <Report_Name>核醫免疫檢驗報告</Report_Name>
+    <Modified_Time>2014/03/24 15:53:11</Modified_Time>
+    <Report_Time>2014/03/24 15:44:03</Report_Time>
+</retExamineRecord>
+<retNumReportLis diffgr:id="retNumReportLis1" msdata:rowOrder="0">
+    <abcdefg xml:space="preserve"></abcdefg>
+    <Test_Name>Free T4 Index (FTI)</Test_Name>
+    <Test_Value>1.93</Test_Value>
+    <Normal_Check>L</Normal_Check>
+    <Ref>2.4~4</Ref>
+    <Ref_Low>2.4</Ref_Low>
+    <Ref_High>4</Ref_High>
+    <Unit>ug/dl</Unit>
+    <Report_User>楊士頤</Report_User>
+    <Item_Code>9303FTI</Item_Code>
+    <Chart_No>99999999</Chart_No>
+    <remark/>
+    <Confirm_Time>2014-03-24T15:44:03+08:00</Confirm_Time>
+</retNumReportLis>
+<retNumReportLis diffgr:id="retNumReportLis2" msdata:rowOrder="1">
+    <abcdefg xml:space="preserve"></abcdefg>
+    <Test_Name>T4</Test_Name>
+    <Test_Value>5.89</Test_Value>
+    <Normal_Check/>
+    <Ref>5~12</Ref>
+    <Ref_Low>5</Ref_Low>
+    <Ref_High>12</Ref_High>
+    <Unit>ug/dl</Unit>
+    <Report_User>楊士頤</Report_User>
+    <Item_Code>9303T4</Item_Code>
+    <Chart_No>99999999</Chart_No>
+    <remark/>
+    <Confirm_Time>2014-03-24T15:44:03+08:00</Confirm_Time>
+</retNumReportLis>
+<retNumReportLis diffgr:id="retNumReportLis3" msdata:rowOrder="2">
+    <abcdefg xml:space="preserve"></abcdefg>
+    <Test_Name>T3</Test_Name>
+    <Test_Value>113.39</Test_Value>
+    <Normal_Check/>
+    <Ref>78~182</Ref>
+    <Ref_Low>78</Ref_Low>
+    <Ref_High>182</Ref_High>
+    <Unit>ng/dl</Unit>
+    <Report_User>楊士頤</Report_User>
+    <Item_Code>9303T3</Item_Code>
+    <Chart_No>99999999</Chart_No>
+    <remark>以公式新數據 = 1.219 * 舊數據 + 0.771 換算得舊數據為:92.39,此數據僅供參考。</remark>
+    <Confirm_Time>2014-03-21T17:05:45+08:00</Confirm_Time>
+</retNumReportLis>
+<retNumReportLis diffgr:id="retNumReportLis4" msdata:rowOrder="3">
+    <abcdefg xml:space="preserve"></abcdefg>
+    <Test_Name>T3 Uptake(T3U)</Test_Name>
+    <Test_Value>32.78</Test_Value>
+    <Normal_Check/>
+    <Ref>30~40</Ref>
+    <Ref_Low>30</Ref_Low>
+    <Ref_High>40</Ref_High>
+    <Unit>%</Unit>
+    <Report_User>楊士頤</Report_User>
+    <Item_Code>9303T3U</Item_Code>
+    <Chart_No>99999999</Chart_No>
+    <remark/>
+    <Confirm_Time>2014-03-24T15:44:03+08:00</Confirm_Time>
+</retNumReportLis>
+<retNumReportLis diffgr:id="retNumReportLis5" msdata:rowOrder="4">
+    <abcdefg xml:space="preserve"></abcdefg>
+    <Test_Name>TSH</Test_Name>
+    <Test_Value>3.82</Test_Value>
+    <Normal_Check/>
+    <Ref>0.25~4</Ref>
+    <Ref_Low>0.25</Ref_Low>
+    <Ref_High>4</Ref_High>
+    <Unit>uU/ml</Unit>
+    <Report_User>楊士頤</Report_User>
+    <Item_Code>9303TSH</Item_Code>
+    <Chart_No>99999999</Chart_No>
+    <remark/>
+    <Confirm_Time>2014-03-20T17:16:17+08:00</Confirm_Time>
+</retNumReportLis>
+
+
+Example of returned text report item:
+
+<retExamineRecord diffgr:id="retExamineRecord1" msdata:rowOrder="0">
+    <Chart_No>99999999</Chart_No>
+    <Patient_Name>............</Patient_Name>
+    <Source_Type_Name>......</Source_Type_Name>
+    <Body_Site_Name>Whole Body</Body_Site_Name>
+    <Medical_Sn>O20149999900509</Medical_Sn>
+    <Request_No>913014P99485</Request_No>
+    <Source_TYpe_Id>O</Source_TYpe_Id>
+    <Specimen_Id/>
+    <Doctor_Name>.........</Doctor_Name>
+    <Spec_No/>
+    <Body_Site_Code>91120</Body_Site_Code>
+    <Body_Site_Small/>
+    <Side_Name/>
+    <Doctor_Code>046567</Doctor_Code>
+    <Dept_Code>01</Dept_Code>
+    <Order_Time>05 7 2014 11:19AM</Order_Time>
+    <Effect_Date>2014-05-07</Effect_Date>
+    <Order_Status>F</Order_Status>
+    <Dept_Name>............</Dept_Name>
+    <Order_Plan_No>38</Order_Plan_No>
+    <Execute_Time>2014/05/14 11:06:07</Execute_Time>
+    <Report_Type>2</Report_Type>
+    <Report_Kind>CT</Report_Kind>
+    <Report_Name>..............................</Report_Name>
+    <Modified_Time>2014/05/20 11:45:15</Modified_Time>
+    <Report_Time>2014/05/20 11:36:49</Report_Time>
+</retExamineRecord>
+<retStateReportList diffgr:id="retStateReportList1" msdata:rowOrder="0" diffgr:hasChanges="inserted">
+    <Report_Text>Clinical: Rt parotid mass noted for 2 years --&gt; biopsy: MALTOMa &#xD; TB pleurisy with anti-TB Mx from 2013/3-2013/11 &#xD; &#xD; Whole body CT with and without IV contrast medium:&#xD; &gt; S/P Resection of Rt parotid tumor.&#xD; &gt; Normal heart size.&#xD; &gt; Fibrotic lesions and subsegmental atelectasis in the Rt lung and Lt lingula segment.&#xD; &gt; Small lymph node over mediastinum, bil. axilla and inguinal regions.&#xD; No abnormal enlarged para-aortic lymph node is detected. &#xD; &gt; No pleural effusion is noted. No ascites is found.&#xD; &gt; The liver, spleen, pancreas and both kidneys are unremarkable.&#xD; &gt; Several small stones in the GB.&#xD; &gt; Calcified plaques are noted along the aorta and its marjor branches.&#xD; &gt; DJD change of the spine.&#xD; &#xD; Impression:&#xD; 1. S/P Resection of Rt parotid tumor.&#xD; 2. No CT evidence of significnat lymphadenopathy.&#xD; 3. Gallstones.&#xD; ...............-......... 800</Report_Text>
+    <Pacs_Index/>
+    <Request_No>913014P99485</Request_No>
+</retStateReportList>
+
 == PACS ==
 Proprietary PACS client ... orz
+Disregard now because most reports are in HIS

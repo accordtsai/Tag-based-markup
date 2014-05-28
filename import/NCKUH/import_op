@@ -1,0 +1,23 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import sys
+import urllib2
+import re
+from BeautifulSoup import BeautifulSoup
+
+if len(sys.argv) < 2:
+	print ("USAGE: import_encounters 00000000")
+	sys.exit(1)
+
+url_a='http://hisweb.hosp.ncku/WebViewer/JTOPNOTE/OpNoteList.aspx?Sys_Code=t/6284um04&Chart_No='
+url=url_a + sys.argv[1]
+
+page=urllib2.urlopen(url)
+soup=BeautifulSoup(page.read())
+ops=soup.findAll('input',{'value':u'檢視報告'})
+
+for op in surgeries:
+	button = op.find('input')
+
+
