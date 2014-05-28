@@ -1,9 +1,11 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+import pprint
 import sys
 import urllib2
 import re
+import pickle
 from BeautifulSoup import BeautifulSoup, BeautifulStoneSoup
 
 if len(sys.argv) < 2:
@@ -13,6 +15,8 @@ if len(sys.argv) < 2:
 baseurl='http://hisweb.hosp.ncku/Emrquery/tree/'
 emrservice='http://hisweb.hosp.ncku/HISService/OPD/nckuHisWeb/EmrService.svc'
 header_data = {'Content-Type': 'application/soap+xml; charset=utf-8','User-Agent':''}
+
+mrd = sys.argv[1]
 
 ### EMR(SOAP) portion ###
 
@@ -86,17 +90,17 @@ def parse_soap(url):
 
         for h in headers:
                 if (re.match(u'\[Subjective\]', h.text)):
-                        res['S'] = h.findNext('div')
+                        res['S'] = h.findNext('div').text
                 if (re.match(u'\[Objective\]', h.text)):
-                        res['O'] = h.findNext('div')
+                        res['O'] = h.findNext('div').text
                 if (re.match(u'\[Assessment\]', h.text)):
-                        res['A'] = h.findNext('div')
+                        res['A'] = h.findNext('div').text
                 if (re.match(u'\[Assessment & Plan\]', h.text)):
-                        res['P'] = h.findNext('div')
+                        res['P'] = h.findNext('div').text
 
 	return res
 
-def get_EMR(mrd, start='2014/1/10', end='2014/5/21'):
+def get_EMR(mrd, start='2001/1/1', end='2014/5/21'):
 	url_a='http://hisweb.hosp.ncku/Emrquery/tree/list.aspx?chartno='+mrd
 	url_b='&start='+start+'&stop='+end+'&query=0'
 
@@ -116,13 +120,14 @@ def get_EMR(mrd, start='2014/1/10', end='2014/5/21'):
 
 		if (type=='OPD'):
 			res[time] = parse_soap(enclink)
+			res[time]['title'] = enctext
 		# Other types (ipd, ER) to be parsed
 	return res
 
 
 ### HIS(labs) portion ###
 
-def get_labs(mrd, start='2014/1/10', end='2014/5/21'):
+def get_labs(mrd, start='2001/1/1', end='2014/5/21'):
 	soap_env = build_soap_menu(mrd, start, end)
 
 	url = urllib2.Request(emrservice, soap_env, header_data)
@@ -182,8 +187,15 @@ def get_item(mrd, serialno):
 		return report_attrs.execute_time.text, results
 
 
-res_emr = get_EMR(sys.argv[1])
-res_labs = get_labs(sys.argv[1])
+res_emr = get_EMR(mrd)
+res_labs = get_labs(mrd)
 
-print "EMR: ",res_emr.keys()
-print "Labs: ", res_labs.keys()
+pickle.dump(res_emr, open(mrd+"_EMR", 'wb'))
+pickle.dump(res_labs, open(mrd+"_HIS", 'wb'))
+
+pp=pprint.PrettyPrinter(indent=2)
+print "EMR:"
+pp.pprint(res_emr)
+print
+print "LIS:"
+pp.pprint(res_labs)

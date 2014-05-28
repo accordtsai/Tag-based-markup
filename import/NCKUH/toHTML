@@ -1,0 +1,62 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import codecs
+import pickle
+import sys
+
+### Generates jQueryUI webpages for EMR viewing
+
+filename = sys.argv[1]
+
+### HTML output generator
+def toHTML(res):
+	header = '''<!doctype html><html lang="us"><head><meta charset="utf-8">
+	<title>EMR jQueryUI version</title>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+	<link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.2/themes/ui-lightness/jquery-ui.css" />
+<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/jquery-ui.min.js"></script>
+	<script>
+	$(function() {
+		
+		$( "#accordion" ).accordion();
+		
+	});
+	</script>
+	<style>
+	body{
+		font: 62.5% "Trebuchet MS", sans-serif;
+		margin: 50px;
+	}
+	.demoHeaders {
+		margin-top: 2em;
+	}
+	</style></head>
+<body>
+
+<div class="ui-widget">
+	<p>Some informative text here</p>
+</div>
+
+<h1>EMR:</h1>
+<!-- Accordion -->
+<h2 class="demoHeaders">Accordion</h2>
+<div id="accordion">'''
+
+	body=''
+	for time in sorted(res.iterkeys()):
+		body += '<h3>' + res[time]['title'] + '</h3><div class="ui-accordion-content">'
+		try:
+			for item in ('S','O','A','P'):
+				body += res[time][item]
+			body += "</div>"
+		except KeyError: # Probably empty SOAP
+			body += 'Empty SOAP' + '</div>'
+
+	return header + body
+
+res = pickle.load(open(filename, 'rb'))
+html = toHTML(res)
+f = codecs.open('output.htm', mode="w", encoding="utf-8-sig")
+f.write(html)
+f.close
