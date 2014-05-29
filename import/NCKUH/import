@@ -75,14 +75,12 @@ def parse_title(title):
 def parse_soap(url):
 	url = baseurl + url
         page=urllib2.urlopen(url)
-        soup=BeautifulSoup(page.read())
+	text=page.read().replace('<br />','\n')  # Replace all <br> (which occurs in SOAP) with newlines
+        soup=BeautifulSoup(text)
 
         soap_content=soup.find('div',{'class':'portlet-content'})
         others=soup.findAll('div', {'class':'iportlet-content'})
 
-        # Remove all <br /> tags
-        for linebreak in soup.findAll('br'):
-                linebreak.extract()
 
         headers=soup.findAll('p')
 

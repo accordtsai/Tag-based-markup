@@ -1,0 +1,42 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+#import codecs
+import pickle
+import sys
+import json
+
+### Generates JSON data for TimelineJS
+
+filename = sys.argv[1]
+
+### HTML output generator
+def toJSON(res):
+
+	# Fields for TimelineJS
+
+	dates=[]
+
+	for time in sorted(res.iterkeys()):
+
+		# Convert time to format suitable for TimelineJS
+		JStime = time[:4] + ',' + time[5:7] + ',' + time[-2:]
+
+		content=''
+		try:
+			for item in ('S','O','A','P'):
+				content += res[time][item].replace('\n','<br>')
+		except KeyError: # Probably empty SOAP
+			content = 'Empty SOAP'
+
+		dateitem={'headline':res[time]['title'],  'startDate':JStime, 'text':content}
+		dates.append(dateitem)
+
+	timeline = {'timeline':{'headline': filename, 'text': filename, 'type': 'default','date': dates}}
+	return timeline
+
+res = pickle.load(open(filename, 'rb'))
+output = toJSON(res)
+fh = open('output.json','wb')
+json.dump(output, fh)
+fh.close
