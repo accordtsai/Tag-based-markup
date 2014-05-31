@@ -7,6 +7,7 @@ Retrospective chart reviews are an important part of medical research. Tons of d
 This system attempts to make that non-structured data accessible, by providing physicians a tool to review these charts and "tag" records for future use. 
 
 This system will be able to provide:
+
 1. An intuitive tool for physicians to perform chart review, since the workflow is essentially the same with paper-based records.
 1. Accurate data, in the sense that all data is generated from the "gold standard" of physician interpretation.
 1. A way to combine information from different institutions (i.e. different data silos in different formats) through collaboration into meaningful data
@@ -47,9 +48,9 @@ Example use cases
 We might want to know what the median survival of stage III lung cancer patients are. 
 We can obtain this data by:
 * Reviewing all stage III lung cancer patients and tag:
-** Treatment start date
-** Date of death
-** Last follow-up (censor) date, which may be tagged automatically and confirmed manually
+* Treatment start date
+  * Date of death  
+  * Last follow-up (censor) date, which may be tagged automatically and confirmed manually
 * Computing survival between treatment start and death/censor
 
 ### Epidemiology
