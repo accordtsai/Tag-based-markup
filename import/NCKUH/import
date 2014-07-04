@@ -130,7 +130,7 @@ def get_EMR(mrd, start='2013/1/1', end='2014/5/21'):
 		if (type=='OPD'):
 			# Found OPD type encounter, add it to the tree
 			res['title'] = enctext
-			encounterET = ET.SubElement(emr, 'OPD', {'title': enctext})
+			encounterET = ET.SubElement(emr, 'OPD', {'title': enctext, 'time': time})
 			parse_soap(enclink, encounterET)
 		# TODO: Other types (ipd, ER) to be parsed
 	return 
