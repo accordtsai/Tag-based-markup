@@ -1,12 +1,13 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import pprint
+### Imports data from NCKUH EMR and HIS system, then outputs to XML
+
 import sys
 import urllib2
-import re
-import pickle
+import re 
 from BeautifulSoup import BeautifulSoup, BeautifulStoneSoup
+import xml.etree.ElementTree as ET
 
 if len(sys.argv) < 2:
 	print ("USAGE: import_encounters 00000000")
@@ -18,6 +19,11 @@ header_data = {'Content-Type': 'application/soap+xml; charset=utf-8','User-Agent
 
 mrd = sys.argv[1]
 
+# XML head
+root = ET.Element("patient", {'MRD': mrd})
+emr = ET.SubElement(root, "EMR")
+his = ET.SubElement(root, "HIS")
+
 ### EMR(SOAP) portion ###
 
 def parse_title(title):
@@ -28,6 +34,7 @@ def parse_title(title):
 	pattern_ipd = re.compile("(20[0-9\/]*)[\s-]+(20[0-9\/]*)&nbsp;(.*)&nbsp;(.*)$")
 	
 	type_c = pattern_type.match(title).group(1)
+	time=''
 
 	if (type_c == u"門診"):
 		# OPD record parsing
@@ -72,7 +79,7 @@ def parse_title(title):
 	return (time,type)
 
 
-def parse_soap(url):
+def parse_soap(url, parentET):
 	url = baseurl + url
         page=urllib2.urlopen(url)
 	text=page.read().replace('<br />','\n')  # Replace all <br> (which occurs in SOAP) with newlines
@@ -88,17 +95,21 @@ def parse_soap(url):
 
         for h in headers:
                 if (re.match(u'\[Subjective\]', h.text)):
-                        res['S'] = h.findNext('div').text
+                        field = ET.SubElement(parentET, 'Subjective')
+			field.text = h.findNext('div').text
                 if (re.match(u'\[Objective\]', h.text)):
-                        res['O'] = h.findNext('div').text
+                        field = ET.SubElement(parentET, 'Objective')
+			field.text = h.findNext('div').text
                 if (re.match(u'\[Assessment\]', h.text)):
-                        res['A'] = h.findNext('div').text
+                        field = ET.SubElement(parentET, 'Assessment')
+			field.text = h.findNext('div').text
                 if (re.match(u'\[Assessment & Plan\]', h.text)):
-                        res['P'] = h.findNext('div').text
+                        field = ET.SubElement(parentET, 'Plan')
+			field.text = h.findNext('div').text
 
 	return res
 
-def get_EMR(mrd, start='2001/1/1', end='2014/5/21'):
+def get_EMR(mrd, start='2013/1/1', end='2014/5/21'):
 	url_a='http://hisweb.hosp.ncku/Emrquery/tree/list.aspx?chartno='+mrd
 	url_b='&start='+start+'&stop='+end+'&query=0'
 
@@ -117,15 +128,17 @@ def get_EMR(mrd, start='2001/1/1', end='2014/5/21'):
 		(time,type) = parse_title(enctext)
 
 		if (type=='OPD'):
-			res[time] = parse_soap(enclink)
-			res[time]['title'] = enctext
-		# Other types (ipd, ER) to be parsed
-	return res
+			# Found OPD type encounter, add it to the tree
+			res['title'] = enctext
+			encounterET = ET.SubElement(emr, 'OPD', {'title': enctext})
+			parse_soap(enclink, encounterET)
+		# TODO: Other types (ipd, ER) to be parsed
+	return 
 
 
 ### HIS(labs) portion ###
 
-def get_labs(mrd, start='2001/1/1', end='2014/5/21'):
+def get_labs(mrd, start='2013/1/1', end='2014/5/21'):
 	soap_env = build_soap_menu(mrd, start, end)
 
 	url = urllib2.Request(emrservice, soap_env, header_data)
@@ -134,7 +147,7 @@ def get_labs(mrd, start='2001/1/1', end='2014/5/21'):
 	soup = BeautifulStoneSoup(response.read())
 
 	reports_all = soup.findAll('retexaminerecord')
-#	print "Total", len(reports_all), "report entries found. Going through each one..."
+#	print "Total", len(reports_all), "report entries found."
 
 	results = {}
 
@@ -143,12 +156,8 @@ def get_labs(mrd, start='2001/1/1', end='2014/5/21'):
 #			print "Skipping", i ,"due to unconfirmed report"
 			continue
 
-		(time, text) = get_item(mrd, reports_all[i].requset_no.text)
-#		print '=========='+ time +'=========='
-#		print text
-		results[time]=text
-
-	return results
+		get_item(mrd, reports_all[i].requset_no.text)  # Add this item to HIS tree
+	return
 
 def build_soap_menu(mrd, start, end):
 	s_head='<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://www.w3.org/2005/08/addressing"><s:Header><a:Action s:mustUnderstand="1">http://tempuri.org/IEmrService/EMRQueryReportRecord</a:Action><a:MessageID>urn:uuid:713986fa-2887-494b-a008-6d696ad019d1</a:MessageID><a:ReplyTo><a:Address>http://www.w3.org/2005/08/addressing/anonymous</a:Address></a:ReplyTo><a:To s:mustUnderstand="1">http://hisweb.hosp.ncku/HISService/OPD/nckuHisWeb/EmrService.svc</a:To></s:Header><s:Body><EMRQueryReportRecord xmlns="http://tempuri.org/"><ChartNO><xs:schema id="NewDataSet" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata"><xs:element name="NewDataSet" msdata:IsDataSet="true" msdata:UseCurrentLocale="true"><xs:complexType><xs:choice minOccurs="0" maxOccurs="unbounded"><xs:element name="Table1"><xs:complexType><xs:sequence><xs:element name="source" type="xs:string" minOccurs="0"/><xs:element name="source1" type="xs:string" minOccurs="0"/><xs:element name="source2" type="xs:string" minOccurs="0"/><xs:element name="source3" type="xs:string" minOccurs="0"/><xs:element name="Chart_No" type="xs:string" minOccurs="0"/><xs:element name="dept_Code" type="xs:string" minOccurs="0"/><xs:element name="start_time" type="xs:string" minOccurs="0"/><xs:element name="end_time" type="xs:string" minOccurs="0"/><xs:element name="Doctor_Code" type="xs:string" minOccurs="0"/><xs:element name="specimen_Id" type="xs:string" minOccurs="0"/><xs:element name="Body_Site_Code" type="xs:string" minOccurs="0"/><xs:element name="request_no" type="xs:string" minOccurs="0"/><xs:element name="report_class" type="xs:string" minOccurs="0"/></xs:sequence></xs:complexType></xs:element><xs:element name="EMR_Query_Log"><xs:complexType><xs:sequence><xs:element name="Query_Time" type="xs:string"/><xs:element name="Employee_Code" type="xs:string" minOccurs="0"/><xs:element name="Employee_Name" type="xs:string" minOccurs="0"/><xs:element name="Query_Item_Id" type="xs:string" minOccurs="0"/><xs:element name="Login_System_Id" type="xs:string" minOccurs="0"/><xs:element name="Query_Content" type="xs:string" minOccurs="0"/><xs:element name="Action_Type" type="xs:string" minOccurs="0"/><xs:element name="Output_Count" type="xs:string" minOccurs="0"/><xs:element name="Output_Device" type="xs:string" minOccurs="0"/></xs:sequence></xs:complexType></xs:element></xs:choice></xs:complexType><xs:unique name="Constraint1" msdata:PrimaryKey="true"><xs:selector xpath=".//EMR_Query_Log"/><xs:field xpath="Query_Time"/></xs:unique></xs:element></xs:schema><diffgr:diffgram xmlns:diffgr="urn:schemas-microsoft-com:xml-diffgram-v1" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata"><NewDataSet xmlns=""><Table1 diffgr:id="Table11" msdata:rowOrder="0" diffgr:hasChanges="inserted"><source/><Chart_No>'
@@ -176,24 +185,32 @@ def get_item(mrd, serialno):
 	report_text = soup.find('retstatereportlist') # Will return results for text report
 
 	if (report_text): 
-		return report_attrs.execute_time.text, {report_attrs.report_name.text : report_text.report_text.text}
+		LabET = ET.SubElement(his, 'lab', {'time': report_attrs.execute_time.text})
+		ItemET = ET.SubElement(LabET, 'item', {'name':report_attrs.report_name.text})
+		ItemET.text = report_text.report_text.text
 	else: # No report_text, probably numerical
-		results = {}
+		LabET = ET.SubElement(his, 'lab', {'time': report_attrs.execute_time.text})
 		report_num = soup.findAll('retnumreportlis')
 		for i in range(len(report_num)):
-			results[report_num[i].test_name.text] = report_num[i].test_value.text
-		return report_attrs.execute_time.text, results
+			ItemET = ET.SubElement(LabET, 'item', {'name':report_num[i].test_name.text})
+			ItemET.text = report_num[i].test_value.text
+	return
 
 
-res_emr = get_EMR(mrd)
-res_labs = get_labs(mrd)
 
-pickle.dump(res_emr, open(mrd+"_EMR", 'wb'))
-pickle.dump(res_labs, open(mrd+"_HIS", 'wb'))
+# Main sequence
 
-pp=pprint.PrettyPrinter(indent=2)
-print "EMR:"
-pp.pprint(res_emr)
+print "Processing", mrd, "..."
+print "Getting EMR data..."
+get_EMR(mrd)
+print "Getting HIS data..."
+get_labs(mrd)
+
+filename = mrd+'.xml'
+print "Writing to", filename, "..."
+
+tree = ET.ElementTree(root)
+tree.write(filename, encoding="UTF-8")
+
 print
-print "LIS:"
-pp.pprint(res_labs)
+print "Import complete!"
