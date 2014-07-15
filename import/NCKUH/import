@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-### Imports data from NCKUH EMR and HIS system, then outputs to XML
+### Imports data from NCKUH EMR and LIS system, then outputs to XML
 
 import sys
 import urllib2
@@ -22,7 +22,7 @@ mrd = sys.argv[1]
 # XML head
 root = ET.Element("patient", {'MRD': mrd})
 emr = ET.SubElement(root, "EMR")
-his = ET.SubElement(root, "HIS")
+lis = ET.SubElement(root, "LIS")
 
 ### EMR(SOAP) portion ###
 
@@ -136,7 +136,7 @@ def get_EMR(mrd, start='2013/1/1', end='2014/5/21'):
 	return 
 
 
-### HIS(labs) portion ###
+### LIS(labs) portion ###
 
 def get_labs(mrd, start='2013/1/1', end='2014/5/21'):
 	soap_env = build_soap_menu(mrd, start, end)
@@ -156,7 +156,7 @@ def get_labs(mrd, start='2013/1/1', end='2014/5/21'):
 #			print "Skipping", i ,"due to unconfirmed report"
 			continue
 
-		get_item(mrd, reports_all[i].requset_no.text)  # Add this item to HIS tree
+		get_item(mrd, reports_all[i].requset_no.text)  # Add this item to LIS tree
 	return
 
 def build_soap_menu(mrd, start, end):
@@ -185,11 +185,11 @@ def get_item(mrd, serialno):
 	report_text = soup.find('retstatereportlist') # Will return results for text report
 
 	if (report_text): 
-		LabET = ET.SubElement(his, 'lab', {'time': report_attrs.execute_time.text})
+		LabET = ET.SubElement(lis, 'lab', {'time': report_attrs.execute_time.text})
 		ItemET = ET.SubElement(LabET, 'item', {'name':report_attrs.report_name.text})
 		ItemET.text = report_text.report_text.text
 	else: # No report_text, probably numerical
-		LabET = ET.SubElement(his, 'lab', {'time': report_attrs.execute_time.text})
+		LabET = ET.SubElement(lis, 'lab', {'time': report_attrs.execute_time.text})
 		report_num = soup.findAll('retnumreportlis')
 		for i in range(len(report_num)):
 			ItemET = ET.SubElement(LabET, 'item', {'name':report_num[i].test_name.text})
@@ -203,7 +203,7 @@ def get_item(mrd, serialno):
 print "Processing", mrd, "..."
 print "Getting EMR data..."
 get_EMR(mrd)
-print "Getting HIS data..."
+print "Getting LIS data..."
 get_labs(mrd)
 
 filename = mrd+'.xml'
