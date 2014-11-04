@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import mechanize
 import urllib2
 import re
 from BeautifulSoup import BeautifulSoup
@@ -9,6 +10,17 @@ from BeautifulSoup import BeautifulSoup
 if len(sys.argv) < 2:
 	print ("USAGE: import_encounters 00000000")
 	sys.exit(1)
+
+def login():
+	### Take care of the login process
+	loginurl='http://hisweb.hosp.ncku/Emrquery/%28S%28vz4gubfwocy4ph55aelh0bvf%29%29/tree/tlogin.aspx'
+	br=mechanize.Browser()
+	br.open(loginurl)
+	br.select_form(name='form1')
+	br['txtUsrID']='ID'
+	br['txtPass']='PW'
+	response=br.submit()
+	return response
 
 def parse_title(title):
 	### Returns type, date, VS, Clinic_no parsed from title
@@ -61,7 +73,10 @@ def parse_title(title):
 		type="Undefined"
 	return type
 
-url_a='http://hisweb.hosp.ncku/Emrquery/tree/list.aspx?chartno='
+if login():
+	print "Login successful"
+
+url_a='http://hisweb.hosp.ncku/Emrquery/%28S%28vz4gubfwocy4ph55aelh0bvf%29%29/tree/list.aspx?chartno='
 url_z='&start=2013/10/1&stop=2014-05-13&query=0'
 
 url=url_a + sys.argv[1] + url_z
