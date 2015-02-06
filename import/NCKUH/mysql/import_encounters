@@ -1,30 +1,27 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import sys
+### This script will grab EMR text information and feed it into MySQL database.
+### Manually navigate to EMR to login and obtain magic string
+
 import mechanize
-import urllib2
 import re
-from BeautifulSoup import BeautifulSoup
-from subprocess import call
+import sys
+import urllib2
+from BeautifulSoup import BeautifulSoup 
+import MySQLdb
+
+magicstr='(S(ybe0g1qxcoxpzm45cxqqkjfd))'
+start_date='2014-01-25'
+end_date='2014-12-31'
 
 if len(sys.argv) < 2:
 	print ("USAGE: import_encounters 00000000")
 	sys.exit(1)
 
-def login():
-	### Take care of the login process
-	loginurl='http://hisweb.hosp.ncku/Emrquery/%28S%28vz4gubfwocy4ph55aelh0bvf%29%29/tree/tlogin.aspx'
-	br=mechanize.Browser()
-	br.open(loginurl)
-	br.select_form(name='form1')
-	br['txtUsrID']='051007'
-	br['txtPass']='n@741024'
-	response=br.submit()
-	return response
-
 def parse_title(title):
 	### Returns date and type parsed from title. Date of last day of admission are returned in case of IPD records.
+
 #	pattern = re.compile("^\((.*)\)(20[0-9\/]*)&nbsp;(.*)&nbsp;(.*)$")
 	pattern_type = re.compile("^\((.*)\)")
 	pattern_opd = re.compile("(20[0-9\/]*)&nbsp;(.*)&nbsp;(.*)$")
@@ -65,16 +62,18 @@ def parse_title(title):
 	else:
 		print "Unable to parse title type!"
 		type="Undefined"
-	return type
+	return None
 
-if login():
-	print "Login successful"
+db = MySQLdb.connect(host="localhost", port=3306, user="cakephp", passwd="cakephp", db="cakephp", charset='utf8')
+cursor = db.cursor()
 
-url_a='http://hisweb.hosp.ncku/Emrquery/%28S%28vz4gubfwocy4ph55aelh0bvf%29%29/tree/list.aspx?chartno='
-url_z='&start=2013-08-21&stop=2014-10-13&query=0'
+url_a='http://hisweb.hosp.ncku/Emrquery/' + magicstr + '/tree/list.aspx?chartno='
+url_z='&start=' + start_date + '&stop=' + end_date + '&query=0'
 
 mrd=sys.argv[1]
 url=url_a + mrd + url_z
+
+print "Locating directory at "+url
 
 page=urllib2.urlopen(url)
 soup=BeautifulSoup(page.read())
@@ -82,21 +81,34 @@ events=soup.find('li',{'id':'emr'}).ul
 
 encounter=events.findChildren('li', recursive=False)
 
-call(['mkdir', sys.argv[1]])
-
 for enc in encounter:
 	enctext=enc.a.text
 	enclink=enc.a.get('href')
 
-#	print enctext # for debug
-#	print enclink
+	print "Processing encounter: " + enctext
 
 	(date, type) = parse_title(enctext)
-	date_filename=mrd+"/"+date[0:4]+date[5:7]+date[8:10] # Remove '/', turn into YYYYMMDD format
-	link = 'http://hisweb.hosp.ncku/Emrquery/%28S%28vz4gubfwocy4ph55aelh0bvf%29%29/tree/'+enclink
-	print link, date_filename
-	call(['wget', link, "-O", date_filename])
-	# We should parse it before saving it... next TODO 20141104
-	# Parse enctext according to OPD, admission, and ER
+#	date_filename=mrd+"/"+date[0:4]+date[5:7]+date[8:10] # Remove '/', turn into YYYYMMDD format
+	link = 'http://hisweb.hosp.ncku/Emrquery/' + magicstr + '/tree/'+enclink
 
-# Generate standardized EMR
+	# Get the raw HTML from the extracted link
+	EMRreader=mechanize.Browser()
+	response=EMRreader.open(link)
+	htmldata=unicode(response.read(), "utf-8")
+
+	print "Fetching data from: " + link + " ..."
+
+	### Brrrr, Unicode troubles
+	cursor.execute("INSERT INTO `cakephp`.`encounters` (`title` , `date`, `patient_id`,`content`,`user_id`) VALUES (%s, %s, %s, %s, %s)",(enctext, date, mrd, htmldata,'1'))
+	print
+
+print "== Commiting to database =="
+try:
+	db.commit()
+except:
+	db.rollback()
+
+print "Encounter import complete!"
+db.close()
+	
+
