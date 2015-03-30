@@ -1,0 +1,33 @@
+<div class="page-header">
+  <%= link_to new_patient_list_patient_path(@patient_list), :class => 'btn btn-primary' do %>
+    <span class="glyphicon glyphicon-plus"></span>
+    New Patient
+  <% end %>
+  <h1>Listing patients</h1>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-striped table-bordered table-hover">
+    <thead>
+      <tr>
+            <th>Name</th>
+            <th>Personal data</th>
+            <th>First name</th>
+            <th>Last name</th>
+            <th></th>
+        <th></th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <%= content_tag_for(:tr, @patients) do |patient| %>
+            <td><%= patient.name %></td>
+            <td><%= patient.personal_data %></td>
+            <td><%= patient.first_name %></td>
+            <td><%= patient.last_name %></td>
+            <td><%= link_to 'Show', patient_list_patient_path(@patient_list, patient) %></td>
+        <td><%= link_to 'Destroy', patient_list_patient_path(@patient_list, patient), method: :delete, data: { confirm: 'Are you sure?' } %></td>
+      <% end %>
+    </tbody>
+  </table>
+</div>

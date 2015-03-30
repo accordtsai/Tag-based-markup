@@ -1,0 +1,9 @@
+<div class="page-header">
+  <h1>Edit Encounter <%= @encounter.title %> Tags</h1>
+</div>
+
+<%= simple_form_for([@patient_list, @patient, @encounter]) do |f| %>
+    <%= f.association :tags, as: :check_boxes %>
+    <%= f.submit "Save", class: "btn btn-primary" %>
+<% end %>
+  

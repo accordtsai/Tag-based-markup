@@ -1,0 +1,53 @@
+<div class="page-header">
+  <h1>Search Result for Tag #<%= @tag.id %>: <%= @tag.name %></h1>
+</div>
+
+
+<h3>Encounters</h3>
+<table class="table table-striped table-bordered table-hover">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Date</th>
+      <th>Patient Name</th>
+    </tr>
+  </thead>
+  <tbody>
+    <%= content_tag_for(:tr, @encounters) do |encounter| %>
+      <td><%= encounter.title %></td>
+      <td><%= encounter.signed_date.to_date %></td>
+      <td><%= encounter.patient.name %></td>
+    <% end %>
+  </tbody>
+</table>
+
+
+<h3>Patients</h3>
+<table class="table table-striped table-bordered table-hover">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Personal data</th>
+      <th>First name</th>
+      <th>Last name</th>
+    </tr>
+  </thead>
+  <tbody>
+    <%= content_tag_for(:tr, @patients) do |patient| %>
+      <td><%= patient.name %></td>
+      <td><%= patient.personal_data %></td>
+      <td><%= patient.first_name %></td>
+      <td><%= patient.last_name %></td>
+    <% end %>
+  </tbody>
+</table>
+
+<%= simple_form_for(:add_to_patient_list, url: add_to_patient_list_search_index_path) do |f| %>
+  <p>## Add all patients above to Paient List</p>
+  <%= f.select :patient_list_id, current_user.patient_lists.for_select %>
+  <% @patients.each do |patient| %>
+    <%= f.hidden_field :patient_ids, multiple: true, value: patient.id %>
+  <% end %>
+  <%= f.submit "Add", class: "btn btn-primary" %>
+<% end %>
+
