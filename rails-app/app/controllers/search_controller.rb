@@ -1,10 +1,10 @@
 class SearchController < ApplicationController
   def index
-    if params[:q].blank? || params[:q][:tag_id].blank?
+    if params[:q].blank? || params[:q][:tag_name].blank?
       flash[:alert] = "Wrong Search"
       return redirect_to root_path
     end
-    @tag = current_user.tags.find(params[:q][:tag_id])
+    @tag = current_user.tags.find(params[:q][:tag_name])
 
     @encounters = @tag.encounters.includes(:patient).recent
     @patients = @tag.patients.recent.uniq

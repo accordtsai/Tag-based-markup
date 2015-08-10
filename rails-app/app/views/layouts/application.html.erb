@@ -46,8 +46,11 @@
             <li><%= link_to "Tags", tags_path %></li>
             <li><%= link_to "Sign Out", destroy_user_session_path, :method => :delete %></li>
 			<li>
-              <%= simple_form_for(:q, html: { class: "navbar-form navbar-left" }, method: :get, url: search_index_path) do |f| %>
-                <label for="tags"> Tag search: </label><input id="tags" size="20">
+              <%= simple_form_for(:q, html: { class: "navbar-form navbar-left" }, method: :get, url: search_index_path) do |f| %>	
+				
+				<%= f.label "Tag search" %>
+				<%= f.text_field :tags %>
+				
                 <%= f.submit "Find", class: "btn btn-default" %>
               <% end %>
             </li>
