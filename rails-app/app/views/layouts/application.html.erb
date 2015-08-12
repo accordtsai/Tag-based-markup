@@ -46,11 +46,8 @@
             <li><%= link_to "Tags", tags_path %></li>
             <li><%= link_to "Sign Out", destroy_user_session_path, :method => :delete %></li>
 			<li>
-              <%= simple_form_for(:q, html: { class: "navbar-form navbar-left" }, method: :get, url: search_index_path) do |f| %>	
-				
-				<%= f.label "Tag search" %>
-				<%= f.text_field :tags %>
-				
+              <%= simple_form_for(:q, html: { class: "navbar-form navbar-left" }, method: :get, url: search_index_path) do |f| %>
+				<%= f.input :tag_id, :url => autocomplete_tag_name_path, :as => :autocomplete, required: false %>
                 <%= f.submit "Find", class: "btn btn-default" %>
               <% end %>
             </li>
