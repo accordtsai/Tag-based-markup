@@ -20,6 +20,7 @@ Rails.application.routes.draw do
   end
 
   resources :tags
+  get :autocomplete_tag_name, to: 'application'
 
   devise_for :users
   # The priority is based upon order of creation: first created -> highest priority.
