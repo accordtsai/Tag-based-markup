@@ -1,0 +1,118 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# 20150814
+# Imports encounters from EMR and inserts into MySQL for use with RoR system
+# Login first and paste magical string below
+
+import sys
+import mechanize
+import urllib2
+import re
+from BeautifulSoup import BeautifulSoup
+import MySQLdb
+# from subprocess import call
+
+if len(sys.argv) < 2:
+	print ("USAGE: import_encounters 00000000")
+	sys.exit(1)
+
+# Connect to MySQL server
+conn = MySQLdb.connect(host='localhost',user='root',passwd='12345678',db='doctor_development', charset='utf8')
+cursor = conn.cursor()
+
+### Magic string HERE ###
+magicstr='S(a4lfppee5bpa2135yo2m553o)'
+######################### 
+
+def parse_title(title):
+	### Returns date and type parsed from title. Date of last day of admission are returned in case of IPD records.
+#	pattern = re.compile("^\((.*)\)(20[0-9\/]*)&nbsp;(.*)&nbsp;(.*)$")
+	pattern_type = re.compile("^\((.*)\)")
+	pattern_opd = re.compile("(20[0-9\/]*)&nbsp;(.*)&nbsp;(.*)$")
+	pattern_ipd = re.compile("(20[0-9\/]*)[\s-]+(20[0-9\/]*)&nbsp;(.*)&nbsp;(.*)$")
+	
+	type_c = pattern_type.match(title).group(1)
+
+	if (type_c == u"門診"):
+		# OPD record parsing
+		type="OPD"
+		result = pattern_opd.search(title)
+
+		if result:
+			return (result.group(1), type)
+		else:
+			# Cannot parse!
+		        print 'No match'
+
+	elif (type_c == u"住院" or type_c == u"急診"):
+		# IPD record parsing
+		if type_c == u"住院":
+			type="IPD"
+		else:
+			type="ER"
+
+                result = pattern_ipd.search(title)
+
+                if result:
+					return (result.group(2), type)
+                else:
+                        # Cannot parse!
+                        print 'No match'
+
+	elif (type_c == u"住院中"):
+		# Currently under admission; ignore
+		# Ignore
+		type='Adm'
+	else:
+		print "Unable to parse title type!"
+		type="Undefined"
+	return type
+
+url_a='http://hisweb.hosp.ncku/Emrquery/%28'+magicstr+'%29/tree/list.aspx?chartno='
+url_z='&start=2015-04-01&stop=2015-08-14&query=0'
+
+mrd=sys.argv[1]
+url=url_a + mrd + url_z
+
+cursor.execute("""
+	INSERT INTO `patients`(`id`, `name`, `personal_data`, `first_name`, `last_name`, `created_at`, `updated_at`) 
+	VALUES (%s, 'Fake name','Fake patient #4','Kabul','Richter',NOW(),NOW())
+	""", mrd)
+
+cursor.execute("""
+	INSERT INTO `patient_list_patients`(`patient_list_id`, `patient_id`, `created_at`, `updated_at`) 
+	VALUES ('1',%s,NOW(),NOW())
+	""", mrd)
+
+page=urllib2.urlopen(url)
+soup=BeautifulSoup(page.read())
+events=soup.find('li',{'id':'emr'}).ul
+
+encounter=events.findChildren('li', recursive=False)
+
+#call(['mkdir', sys.argv[1]])
+
+# Go through encounters one by one
+
+for enc in encounter:
+	enctext=enc.a.text
+	enclink=enc.a.get('href')
+
+#	print enctext # for debug
+#	print enclink
+
+	(date, type) = parse_title(enctext)
+	date_filename=mrd+"/"+date[0:4]+date[5:7]+date[8:10]+".html" # Remove '/', turn into YYYYMMDD format
+	link = 'http://hisweb.hosp.ncku/Emrquery/%28'+magicstr+'%29/tree/'+enclink
+	emrpage=urllib2.urlopen(link)
+	emrcontent=emrpage.read()
+	print enctext, len(emrcontent)
+	cursor.execute ("""
+		INSERT INTO `encounters`(`title`, `signed_date`, `content`, `patient_id`, `created_at`, `updated_at`) 
+		VALUES 
+			(%s, %s, %s, %s, NOW(), NOW())
+		""", (enctext, date, emrcontent, mrd))
+
+conn.commit()
+conn.close()
